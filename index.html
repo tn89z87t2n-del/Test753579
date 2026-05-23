@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Octagon Sphere</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* 3D stage */
+    .scene {
+      perspective: 1400px;
+      transform: scale(min(1, 90vmin / 480px));
+    }
+
+    /* the spinning octahedron */
+    .octa {
+      width: 0;
+      height: 0;
+      position: relative;
+      transform-style: preserve-3d;
+      animation: spin 20s linear infinite;
+      filter: drop-shadow(0 0 14px rgba(255, 255, 255, 0.55));
+    }
+
+    .pyramid {
+      position: absolute;
+      transform-style: preserve-3d;
+    }
+
+    .pyramid.bottom {
+      transform: rotateX(180deg);
+    }
+
+    /* each triangular face: equilateral triangle, apex top / base bottom */
+    .face {
+      position: absolute;
+      width: 240px;
+      height: 207.846px;             /* edge * sqrt(3)/2 */
+      left: -120px;                  /* center base midpoint on the octa origin */
+      top: -207.846px;
+      transform-origin: 50% 100%;    /* rotate about the base edge */
+      clip-path: polygon(50% 0, 0 100%, 100% 100%);
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    /* swing each face to one of 4 sides, push base out to the equator,
+       tilt up so the apex meets the pole. 35.2644deg = atan(1/sqrt(2)) */
+    .face.f1 { transform: rotateY(0deg)   translateZ(120px) rotateX(35.2644deg); }
+    .face.f2 { transform: rotateY(90deg)  translateZ(120px) rotateX(35.2644deg); }
+    .face.f3 { transform: rotateY(180deg) translateZ(120px) rotateX(35.2644deg); }
+    .face.f4 { transform: rotateY(270deg) translateZ(120px) rotateX(35.2644deg); }
+
+    @keyframes spin {
+      from { transform: rotateX(-14deg) rotateY(0deg); }
+      to   { transform: rotateX(-14deg) rotateY(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="scene">
+    <div class="octa">
+      <div class="pyramid top">
+        <div class="face f1"></div>
+        <div class="face f2"></div>
+        <div class="face f3"></div>
+        <div class="face f4"></div>
+      </div>
+      <div class="pyramid bottom">
+        <div class="face f1"></div>
+        <div class="face f2"></div>
+        <div class="face f3"></div>
+        <div class="face f4"></div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
