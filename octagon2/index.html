@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Octagon</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; background: #000; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+  <script>
+    const canvas = document.getElementById("scene");
+    const ctx = canvas.getContext("2d");
+
+    // geodesic ball: tessellate each octahedron face into freq^2 triangles,
+    // project every point onto the sphere. points = 4*freq^2 + 2.
+    // freq 2 -> 18 points / 48 edges ; freq 3 -> 38 points / 108 edges
+    function buildGeoBall(freq) {
+      const baseV = [
+        [ 1, 0, 0], [-1, 0, 0],
+        [ 0, 1, 0], [ 0,-1, 0],
+        [ 0, 0, 1], [ 0, 0,-1],
+      ];
+      const baseF = [
+        [0, 2, 4], [2, 1, 4], [1, 3, 4], [3, 0, 4],
+        [2, 0, 5], [1, 2, 5], [3, 1, 5], [0, 3, 5],
+      ];
+
+      const verts = [], vmap = new Map();
+      const addVert = (x, y, z) => {
+        const len = Math.hypot(x, y, z);
+        x /= len; y /= len; z /= len;
+        const key = x.toFixed(5) + "," + y.toFixed(5) + "," + z.toFixed(5);
+        let idx = vmap.get(key);
+        if (idx === undefined) { idx = verts.length; verts.push([x, y, z]); vmap.set(key, idx); }
+        return idx;
+      };
+
+      const eseen = new Set(), edges = [];
+      const addEdge = (a, b) => {
+        if (a === b) return;
+        const k = a < b ? a + "_" + b : b + "_" + a;
+        if (!eseen.has(k)) { eseen.add(k); edges.push([a, b]); }
+      };
+
+      for (const [ia, ib, ic] of baseF) {
+        const A = baseV[ia], B = baseV[ib], C = baseV[ic];
+        const grid = [];
+        for (let i = 0; i <= freq; i++) {
+          grid[i] = [];
+          for (let j = 0; j <= freq - i; j++) {
+            const a = (freq - i - j) / freq, b = j / freq, c = i / freq;
+            grid[i][j] = addVert(
+              A[0] * a + B[0] * b + C[0] * c,
+              A[1] * a + B[1] * b + C[1] * c,
+              A[2] * a + B[2] * b + C[2] * c
+            );
+          }
+        }
+        for (let i = 0; i < freq; i++) {
+          for (let j = 0; j < freq - i; j++) {
+            const v0 = grid[i][j], v1 = grid[i][j + 1], v2 = grid[i + 1][j];
+            addEdge(v0, v1); addEdge(v1, v2); addEdge(v2, v0);
+            if (j < freq - i - 1) {
+              const v3 = grid[i + 1][j + 1];
+              addEdge(v1, v3); addEdge(v3, v2);
+            }
+          }
+        }
+      }
+      return { verts, edges };
+    }
+
+    const { verts, edges } = buildGeoBall(3);
+
+    let w, h, scale;
+    function resize() {
+      const dpr = window.devicePixelRatio || 1;
+      w = window.innerWidth;
+      h = window.innerHeight;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      canvas.style.width = w + "px";
+      canvas.style.height = h + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      scale = Math.min(w, h) * 0.3;
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    let ax = 0, ay = 0, az = 0;
+
+    function rotate([x, y, z]) {
+      let c = Math.cos(ax), s = Math.sin(ax);
+      [y, z] = [y * c - z * s, y * s + z * c];
+      c = Math.cos(ay); s = Math.sin(ay);
+      [x, z] = [x * c + z * s, -x * s + z * c];
+      c = Math.cos(az); s = Math.sin(az);
+      [x, y] = [x * c - y * s, x * s + y * c];
+      return [x, y, z];
+    }
+
+    function project([x, y, z]) {
+      const d = 4;
+      const p = d / (d - z);
+      return [w / 2 + x * scale * p, h / 2 + y * scale * p];
+    }
+
+    function frame() {
+      ax += 0.006;
+      ay += 0.009;
+      az += 0.004;
+
+      ctx.clearRect(0, 0, w, h);
+
+      const pts = verts.map(v => project(rotate(v)));
+
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1.5;
+      ctx.lineCap = "round";
+      ctx.shadowColor = "rgba(255,255,255,0.8)";
+      ctx.shadowBlur = 8;
+      for (const [a, b] of edges) {
+        ctx.beginPath();
+        ctx.moveTo(pts[a][0], pts[a][1]);
+        ctx.lineTo(pts[b][0], pts[b][1]);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = "#ffffff";
+      for (const [px, py] of pts) {
+        ctx.beginPath();
+        ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      requestAnimationFrame(frame);
+    }
+    frame();
+  </script>
+</body>
+</html>
