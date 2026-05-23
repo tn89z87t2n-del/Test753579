@@ -6,85 +6,103 @@
   <title>Octagon Sphere</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    html, body {
-      height: 100%;
-      background: #000;
-      overflow: hidden;
-    }
-
-    body {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    /* 3D stage */
-    .scene {
-      perspective: 1400px;
-      transform: scale(min(1, 90vmin / 480px));
-    }
-
-    /* the spinning octahedron */
-    .octa {
-      width: 0;
-      height: 0;
-      position: relative;
-      transform-style: preserve-3d;
-      animation: spin 20s linear infinite;
-      filter: drop-shadow(0 0 14px rgba(255, 255, 255, 0.55));
-    }
-
-    .pyramid {
-      position: absolute;
-      transform-style: preserve-3d;
-    }
-
-    .pyramid.bottom {
-      transform: rotateX(180deg);
-    }
-
-    /* each triangular face: equilateral triangle, apex top / base bottom */
-    .face {
-      position: absolute;
-      width: 240px;
-      height: 207.846px;             /* edge * sqrt(3)/2 */
-      left: -120px;                  /* center base midpoint on the octa origin */
-      top: -207.846px;
-      transform-origin: 50% 100%;    /* rotate about the base edge */
-      clip-path: polygon(50% 0, 0 100%, 100% 100%);
-      background: rgba(255, 255, 255, 0.12);
-    }
-
-    /* swing each face to one of 4 sides, push base out to the equator,
-       tilt up so the apex meets the pole. 35.2644deg = atan(1/sqrt(2)) */
-    .face.f1 { transform: rotateY(0deg)   translateZ(120px) rotateX(35.2644deg); }
-    .face.f2 { transform: rotateY(90deg)  translateZ(120px) rotateX(35.2644deg); }
-    .face.f3 { transform: rotateY(180deg) translateZ(120px) rotateX(35.2644deg); }
-    .face.f4 { transform: rotateY(270deg) translateZ(120px) rotateX(35.2644deg); }
-
-    @keyframes spin {
-      from { transform: rotateX(-14deg) rotateY(0deg); }
-      to   { transform: rotateX(-14deg) rotateY(360deg); }
-    }
+    html, body { height: 100%; background: #000; overflow: hidden; }
+    canvas { display: block; }
   </style>
 </head>
 <body>
-  <div class="scene">
-    <div class="octa">
-      <div class="pyramid top">
-        <div class="face f1"></div>
-        <div class="face f2"></div>
-        <div class="face f3"></div>
-        <div class="face f4"></div>
-      </div>
-      <div class="pyramid bottom">
-        <div class="face f1"></div>
-        <div class="face f2"></div>
-        <div class="face f3"></div>
-        <div class="face f4"></div>
-      </div>
-    </div>
-  </div>
+  <canvas id="scene"></canvas>
+  <script>
+    const canvas = document.getElementById("scene");
+    const ctx = canvas.getContext("2d");
+
+    // octahedron: 6 vertices
+    const vertices = [
+      [ 1,  0,  0],
+      [-1,  0,  0],
+      [ 0,  1,  0],
+      [ 0, -1,  0],
+      [ 0,  0,  1],
+      [ 0,  0, -1],
+    ];
+
+    // edges: every vertex pair except the 3 opposite pairs -> 12 edges
+    const edges = [
+      [0, 2], [0, 3], [0, 4], [0, 5],
+      [1, 2], [1, 3], [1, 4], [1, 5],
+      [2, 4], [2, 5], [3, 4], [3, 5],
+    ];
+
+    let w, h, scale;
+    function resize() {
+      const dpr = window.devicePixelRatio || 1;
+      w = window.innerWidth;
+      h = window.innerHeight;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      canvas.style.width = w + "px";
+      canvas.style.height = h + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      scale = Math.min(w, h) * 0.3;
+    }
+    window.addEventListener("resize", resize);
+    resize();
+
+    // independent rotation angles -> tumbling on all axes
+    let ax = 0, ay = 0, az = 0;
+
+    function rotate([x, y, z]) {
+      // rotate around X
+      let cy = Math.cos(ax), sy = Math.sin(ax);
+      [y, z] = [y * cy - z * sy, y * sy + z * cy];
+      // rotate around Y
+      let cx = Math.cos(ay), sx = Math.sin(ay);
+      [x, z] = [x * cx + z * sx, -x * sx + z * cx];
+      // rotate around Z
+      let cz = Math.cos(az), sz = Math.sin(az);
+      [x, y] = [x * cz - y * sz, x * sz + y * cz];
+      return [x, y, z];
+    }
+
+    function project([x, y, z]) {
+      const d = 4;                      // camera distance
+      const p = d / (d - z);            // perspective
+      return [w / 2 + x * scale * p, h / 2 + y * scale * p];
+    }
+
+    function frame() {
+      ax += 0.006;
+      ay += 0.009;
+      az += 0.004;
+
+      ctx.clearRect(0, 0, w, h);
+
+      const pts = vertices.map(v => project(rotate(v)));
+
+      // white connecting lines with a soft glow
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 2;
+      ctx.lineCap = "round";
+      ctx.shadowColor = "rgba(255,255,255,0.8)";
+      ctx.shadowBlur = 12;
+      for (const [a, b] of edges) {
+        ctx.beginPath();
+        ctx.moveTo(pts[a][0], pts[a][1]);
+        ctx.lineTo(pts[b][0], pts[b][1]);
+        ctx.stroke();
+      }
+
+      // dots at the points
+      ctx.fillStyle = "#ffffff";
+      for (const [px, py] of pts) {
+        ctx.beginPath();
+        ctx.arc(px, py, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      requestAnimationFrame(frame);
+    }
+    frame();
+  </script>
 </body>
 </html>
